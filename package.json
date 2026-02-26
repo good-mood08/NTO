@@ -5,10 +5,11 @@
   "workspaces": [
     "apps/*"
   ],
-    "scripts": {
+  "scripts": {
     "dev": "chcp 65001 > nul && turbo dev",
+    "preview": "turbo preview",
     "build": "turbo build"
-    },
+  },
   "devDependencies": {
     "turbo": "^2.8.11"
   }

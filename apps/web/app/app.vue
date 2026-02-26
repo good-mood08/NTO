@@ -1,8 +1,8 @@
 <template>
   <UApp>
-    <UContainer>
+    <!-- <UContainer> -->
 
       <NuxtPage />
-    </UContainer>
+    <!-- </UContainer> -->
   </UApp>
 </template>

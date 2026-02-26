@@ -14,9 +14,7 @@ export const useCV = () => {
   const connectToServer = () => {
     if (socket.value?.connected) return;
 
-
     const serverUrl = `https://${window.location.hostname}:8000`;
-    // alert("Пытаюсь подключиться к: " + serverUrl);
     socket.value = io(serverUrl,{
       transports: ['websocket'],
       secure: true,
@@ -35,7 +33,6 @@ export const useCV = () => {
 
     socket.value.on("connect_error", (err) => {
       console.error("🌐 Connection Error:", err.message);
-      // Если видишь "xhr poll error", значит браузер блокирует HTTP внутри HTTPS
     });
 
     socket.value.on("processed_frame", (data: ArrayBuffer) => {

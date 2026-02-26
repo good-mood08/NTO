@@ -3,13 +3,19 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".output/**", "dist/**"]
+      "outputs": ["dist/**", ".output/**", "build/**", ".next/**"]
+    },
+    "preview": {
+      "dependsOn": ["build"],
+      "cache": false
     },
     "dev": {
       "cache": false,
       "persistent": true,
       "passThroughEnv": ["*"]
     },
-    "lint": {}
+    "lint": {
+      "cache": true
+    }
   }
 }
