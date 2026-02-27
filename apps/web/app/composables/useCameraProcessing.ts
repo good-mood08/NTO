@@ -117,8 +117,6 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
   }
 
 
-  let lastSendTime = 0
-  const SEND_INTERVAL = 10
 
   // 2. Оптимизированная отправка кадра
   const captureAndSend = () => {
@@ -129,11 +127,6 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
 
      
 
-    if (Date.now() - lastSendTime < SEND_INTERVAL) {
-      // Если время еще не пришло, планируем следующую проверку через requestAnimationFrame
-      requestAnimationFrame(captureAndSend)
-      return
-    }
     const v = videoRef.value
     if (!v.videoWidth) return
 
@@ -145,8 +138,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     }
 
     isLocked = true
-    lastSendTime = Date.now()
-    const octx = offscreenCanvas.getContext('2d')
+    const octx = offscreenCanvas.getContext('2d', {alpha: false, desynchronized: true})
     octx?.drawImage(v, 0, 0, offscreenCanvas.width, offscreenCanvas.height)
 
     offscreenCanvas.toBlob(
@@ -158,42 +150,47 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
         }
       },
       'image/jpeg',
-      0.4
+      0.8
     )
   }
 
   // 3. Обработка входящего кадра
-  watch(processedImage, newUrl => {
-    if (!newUrl) {
-      isLocked = false
-      return
+  watch(processedImage, async (newBlob) => {
+    if (!newBlob || !(newBlob instanceof Blob) || !isStreaming.value) {
+      isLocked = false;
+      return;
     }
-    
-    const canvas = canvasRef.value
-    const v = videoRef.value
-    if (!canvas || !v) return
 
-    const img = new Image()
-    img.onload = () => {
-      if (value.value !== 'none' && isStreaming.value) {
-        if (canvas.width !== v.videoWidth) {
-          canvas.width = v.videoWidth
-          canvas.height = v.videoHeight
-        }
-        const ctx = canvas.getContext('2d')
-        ctx?.clearRect(0, 0, canvas.width, canvas.height)
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const canvas = canvasRef.value;
+    const v = videoRef.value;
+    if (!canvas || !v) return;
+
+    try {
+      // 1. Декодируем WebP в фоновом потоке (GPU)
+      const bitmap = await createImageBitmap(newBlob);
+
+      // 2. Подгоняем размер канваса (один раз)
+      if (canvas.width !== v.videoWidth) {
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
       }
-      URL.revokeObjectURL(newUrl)
-      isLocked = false
-      requestAnimationFrame(captureAndSend)
+
+      const ctx = canvas.getContext('2d', { alpha: true });
+      if (ctx) {
+        // 3. Очищаем только если это маска. Если это полный кадр (gray), можно не чистить.
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      }
+
+      bitmap.close(); // Очистка памяти
+    } catch (err) {
+      console.error("Bitmap error:", err);
+    } finally {
+      isLocked = false;
+      // ОПТИМИЗАЦИЯ: вызываем захват следующего кадра сразу
+      requestAnimationFrame(captureAndSend);
     }
-    img.onerror = () => {
-      isLocked = false
-      URL.revokeObjectURL(newUrl)
-    }
-    img.src = newUrl
-  })
+  });
 
   // 4. Логика жизненного цикла (ИСПРАВЛЕНИЕ СТАТУСА)
   onMounted(() => {

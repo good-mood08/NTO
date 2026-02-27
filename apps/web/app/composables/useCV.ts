@@ -7,7 +7,7 @@ interface FramePayload {
 }
 
 const socket = ref<Socket | null>(null);
-const processedImage = ref<string | null>(null);
+const processedImage = ref<Blob | null>(null);
 const isConnected = ref(false);
 
 export const useCV = () => {
@@ -36,9 +36,7 @@ export const useCV = () => {
     });
 
     socket.value.on("processed_frame", (data: ArrayBuffer) => {
-      const blob = new Blob([data], { type: "image/webp" });
-      const newUrl = URL.createObjectURL(blob);
-      processedImage.value = newUrl;
+      processedImage.value = new Blob([data], { type: "image/webp" });
     });
   };
 

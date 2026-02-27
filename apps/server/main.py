@@ -3,19 +3,18 @@ import uvicorn
 import cv2
 import numpy as np
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 import processor_ar_game, processor_yolo, processor_effects, processor_ruler, processor_aruco
 
 sio = socketio.AsyncServer(
     async_mode='asgi', 
     cors_allowed_origins='*',
-    ping_timeout=20,  # Увеличиваем до 20 секунд
-    ping_interval=5,
-    max_decode_packets=50
+    engineio_logger=False
 )
 app = socketio.ASGIApp(sio)
-executor = ThreadPoolExecutor(max_workers=3)
+
+executor = ProcessPoolExecutor(max_workers=4)
 processing_clients = set()
 
 def get_delta_mask(original, processed):
@@ -43,7 +42,7 @@ async def handle_frame(sid, data):
         return 
 
     processing_clients.add(sid)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     
     try:
         # Получаем байты
@@ -98,5 +97,5 @@ if __name__ == "__main__":
         port=8000,
         ssl_keyfile="./key.pem",  # Путь к ключу (возьми из Nuxt)
         ssl_certfile="./cert.pem", # Путь к сертификату
-        log_level="warning"
+        log_level="warning",
     )
