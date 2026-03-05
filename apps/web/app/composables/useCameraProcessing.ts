@@ -1,19 +1,11 @@
 import {
-
   ref,
-
   watch,
-
   watchEffect,
-
   onMounted,
-
   onUnmounted,
-
   navigateTo,
-
   useUserMedia
-
 } from '#imports'
 
 import { useCV } from '#imports'
@@ -59,7 +51,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     }))
   })
 
-  const { connectToServer, sendFrame, processedImage, isConnected } = useCV()
+  const { connectToServer, sendFrame, processedImage, isConnected, startWebRTC, stopWebRTC } = useCV()
 
   const videoRef = ref<HTMLVideoElement | null>(null)
   const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -120,38 +112,10 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
 
   // 2. Оптимизированная отправка кадра
   const captureAndSend = () => {
-    // Проверка isConnected.value теперь будет работать, так как мы запустили коннект в onMounted
-    if (!videoRef.value || !isStreaming.value || !isConnected.value || isLocked || value.value === 'none') {
-      return
-    }
-
-     
-
-    const v = videoRef.value
-    if (!v.videoWidth) return
-
-    if (!offscreenCanvas) {
-      offscreenCanvas = document.createElement('canvas')
-      const scale = 640 / v.videoWidth
-      offscreenCanvas.width = 640
-      offscreenCanvas.height = v.videoHeight * scale
-    }
-
-    isLocked = true
-    const octx = offscreenCanvas.getContext('2d', {alpha: false, desynchronized: true})
-    octx?.drawImage(v, 0, 0, offscreenCanvas.width, offscreenCanvas.height)
-
-    offscreenCanvas.toBlob(
-      blob => {
-        if (blob && isStreaming.value && value.value !== 'none') {
-          sendFrame({ image: blob, mode: value.value })
-        } else {
-          isLocked = false // Важно разлочить, если условия не пошли
-        }
-      },
-      'image/jpeg',
-      0.8
-    )
+    // В режиме WebRTC видео идёт потоком, здесь мы лишь сообщаем серверу актуальный режим.
+    if (!isStreaming.value || !isConnected.value) return
+    if (value.value === 'none') return
+    sendFrame({ image: new Blob(), mode: value.value })
   }
 
   // 3. Обработка входящего кадра
@@ -187,7 +151,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
       console.error("Bitmap error:", err);
     } finally {
       isLocked = false;
-      // ОПТИМИЗАЦИЯ: вызываем захват следующего кадра сразу
+      // В режиме WebRTC достаточно лишь периодически синхронизировать режим обработки.
       requestAnimationFrame(captureAndSend);
     }
   });
@@ -215,6 +179,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     if (reconnectInterval) clearInterval(reconnectInterval)
     stop()
     offscreenCanvas = null
+    stopWebRTC()
   })
 
   // 5. Управление стримом
@@ -222,7 +187,11 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     try {
       await start()
       isStreaming.value = true
-      
+
+      // Инициализируем WebRTC, когда у нас есть стрим камеры
+      if (stream.value) {
+        startWebRTC(stream.value)
+      }
       if (videoRef.value) {
         videoRef.value.onloadedmetadata = () => {
           captureAndSend()
@@ -237,6 +206,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     isStreaming.value = false
     isLocked = false
     stop()
+    stopWebRTC()
   }
 
   // watchEffect для привязки стрима к видео-тегу
