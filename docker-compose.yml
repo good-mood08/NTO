@@ -1,0 +1,18 @@
+services:
+  web:
+    container_name: "web"
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    restart: always
+
+  cms:
+    container_name: "server-api"
+    build:
+      context: .
+      dockerfile: ./apps/server/Dockerfile
+    ports:
+      - "8000:8000"
+    restart: always

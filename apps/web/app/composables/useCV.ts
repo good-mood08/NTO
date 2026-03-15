@@ -22,6 +22,7 @@ export const useCV = () => {
     if (socket.value?.connected) return;
 
     const serverUrl = `https://${window.location.hostname}:8000`;
+    console.log("Trying to connect to CV server:", serverUrl);
     socket.value = io(serverUrl,{
       transports: ['websocket'],
       secure: true,

@@ -45,9 +45,8 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
    
   // 1. Инициализация Media и CV
   const { stream, start, stop } = useUserMedia({
-    constraints: computed(() =>({
+    constraints: computed(() => ({
       video: { facingMode: facingMode.value, frameRate: { ideal: 40 } }
-    
     }))
   })
 
@@ -84,6 +83,8 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     isSwitching.value = true
     isLocked = true
 
+    // Полностью перезапускаем медиапоток и WebRTC, чтобы сервер продолжил получать видео после смены камеры
+    stopWebRTC()
     stop()
 
     facingMode.value = facingMode.value === 'environment' ? 'user' : 'environment'
@@ -91,7 +92,12 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
 
     try {
       await start()
-      
+
+      // Привязываем новый стрим к WebRTC
+      if (stream.value) {
+        startWebRTC(stream.value)
+      }
+
       if (videoRef.value) {
         // Ждем, когда новая камера реально отдаст картинку
         videoRef.value.onloadedmetadata = () => {
@@ -156,6 +162,17 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     }
   });
 
+  const clearFrame = () => {
+    const canvas = canvasRef.value
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      }
+    }
+    processedImage.value = null
+  }
+
   // 4. Логика жизненного цикла (ИСПРАВЛЕНИЕ СТАТУСА)
   onMounted(() => {
     if (redirectMobileTo && isMobileDevice()) {
@@ -180,6 +197,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     stop()
     offscreenCanvas = null
     stopWebRTC()
+    clearFrame()
   })
 
   // 5. Управление стримом
@@ -207,6 +225,7 @@ export const useCameraProcessing = (options: UseCameraProcessingOptions = {}) =>
     isLocked = false
     stop()
     stopWebRTC()
+    clearFrame()
   }
 
   // watchEffect для привязки стрима к видео-тегу
